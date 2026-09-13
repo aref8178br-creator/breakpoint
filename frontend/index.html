@@ -34,10 +34,29 @@
         <select id="country-filter">
           <option value="">All Countries</option>
         </select>
+        <select id="stars-filter">
+          <option value="">Any Stars</option>
+          <option value="5">5 Stars</option>
+          <option value="4">4 Stars</option>
+          <option value="3">3 Stars</option>
+        </select>
+        <select id="sort-filter">
+          <option value="name_asc">Name A-Z</option>
+          <option value="price_asc">Price: Low to High</option>
+          <option value="price_desc">Price: High to Low</option>
+          <option value="stars_desc">Stars: High to Low</option>
+        </select>
+        <input type="number" id="min-price" placeholder="Min $" min="0">
+        <input type="number" id="max-price" placeholder="Max $" min="0">
+        <select id="amenity-filter">
+          <option value="">Any Amenity</option>
+        </select>
         <input type="date" id="checkin" min="2026-09-10" max="2026-09-30">
         <input type="date" id="checkout" min="2026-09-10" max="2026-09-30">
         <button onclick="filterHotels()">Search</button>
+        <button class="reset-btn" onclick="resetFilters()">Reset</button>
       </div>
+      <div class="results-count" id="results-count"></div>
     </div>
   </section>
 

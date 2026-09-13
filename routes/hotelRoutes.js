@@ -5,6 +5,7 @@ const hotelController = require('../controllers/hotelController');
 router.get('/', hotelController.getAll);
 router.get('/cities', hotelController.getCities);
 router.get('/countries', hotelController.getCountries);
+router.get('/amenities', hotelController.getAmenityList);
 router.get('/:id', hotelController.getById);
 router.get('/:id/rooms', hotelController.getRooms);
 router.get('/:id/amenities', hotelController.getAmenities);

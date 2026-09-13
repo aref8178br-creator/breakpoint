@@ -1,7 +1,6 @@
 const API = '';
 
-let currentFilter = { city: '', country: '', checkin: '', checkout: '' };
-let allHotels = [];
+let debounceTimer = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   await initFilters();
@@ -9,10 +8,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupModalClose();
   loadStats();
 
-  document.getElementById('text-search').addEventListener('input', filterHotels);
+  // Live search with debounce
+  document.getElementById('text-search').addEventListener('input', debounceFilter);
   document.getElementById('city-filter').addEventListener('change', filterHotels);
   document.getElementById('country-filter').addEventListener('change', filterHotels);
+  document.getElementById('stars-filter').addEventListener('change', filterHotels);
+  document.getElementById('sort-filter').addEventListener('change', filterHotels);
+  document.getElementById('min-price').addEventListener('input', debounceFilter);
+  document.getElementById('max-price').addEventListener('input', debounceFilter);
+  document.getElementById('amenity-filter').addEventListener('change', filterHotels);
+  document.getElementById('checkin').addEventListener('change', filterHotels);
+  document.getElementById('checkout').addEventListener('change', filterHotels);
 });
+
+function debounceFilter() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(filterHotels, 300);
+}
 
 async function loadStats() {
   try {
@@ -24,12 +36,14 @@ async function loadStats() {
 
 async function initFilters() {
   try {
-    const [citiesRes, countriesRes] = await Promise.all([
-      fetch(`${API}/api/cities`),
-      fetch(`${API}/api/countries`)
+    const [citiesRes, countriesRes, amenitiesRes] = await Promise.all([
+      fetch(`${API}/api/hotels/cities`),
+      fetch(`${API}/api/hotels/countries`),
+      fetch(`${API}/api/hotels/amenities`)
     ]);
     const cities = await citiesRes.json();
     const countries = await countriesRes.json();
+    const amenities = await amenitiesRes.json();
 
     const citySelect = document.getElementById('city-filter');
     cities.forEach(city => {
@@ -46,43 +60,76 @@ async function initFilters() {
       opt.textContent = country;
       countrySelect.appendChild(opt);
     });
+
+    const amenitySelect = document.getElementById('amenity-filter');
+    amenities.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = a.name;
+      amenitySelect.appendChild(opt);
+    });
   } catch (e) {
     console.error('Failed to load filters:', e);
   }
 }
 
-async function loadHotels(filters = {}) {
-  try {
-    const params = new URLSearchParams();
-    if (filters.search) params.set('search', filters.search);
-    if (filters.city) params.set('city', filters.city);
-    if (filters.country) params.set('country', filters.country);
-    if (filters.checkin) params.set('checkin', filters.checkin);
+function getFilters() {
+  return {
+    search: document.getElementById('text-search').value,
+    city: document.getElementById('city-filter').value,
+    country: document.getElementById('country-filter').value,
+    stars: document.getElementById('stars-filter').value,
+    sortBy: document.getElementById('sort-filter').value,
+    minPrice: document.getElementById('min-price').value,
+    maxPrice: document.getElementById('max-price').value,
+    amenity: document.getElementById('amenity-filter').value,
+    checkin: document.getElementById('checkin').value,
+    checkout: document.getElementById('checkout').value
+  };
+}
 
+async function filterHotels() {
+  const filters = getFilters();
+  const params = new URLSearchParams();
+
+  Object.entries(filters).forEach(([key, val]) => {
+    if (val) params.set(key, val);
+  });
+
+  try {
     const res = await fetch(`${API}/api/hotels?${params}`);
     const hotels = await res.json();
-    allHotels = hotels;
     renderHotels(hotels);
+
+    const countEl = document.getElementById('results-count');
+    countEl.textContent = `${hotels.length} hotel${hotels.length !== 1 ? 's' : ''} found`;
   } catch (e) {
-    console.error('Failed to load hotels:', e);
+    console.error('Failed to filter hotels:', e);
   }
 }
 
-function filterHotels() {
-  const text = document.getElementById('text-search').value;
-  const city = document.getElementById('city-filter').value;
-  const country = document.getElementById('country-filter').value;
-  const checkin = document.getElementById('checkin').value;
-  const checkout = document.getElementById('checkout').value;
-
-  currentFilter = { city, country, checkin, checkout };
-  loadHotels({ search: text, city, country, checkin });
+function resetFilters() {
+  document.getElementById('text-search').value = '';
+  document.getElementById('city-filter').value = '';
+  document.getElementById('country-filter').value = '';
+  document.getElementById('stars-filter').value = '';
+  document.getElementById('sort-filter').value = 'name_asc';
+  document.getElementById('min-price').value = '';
+  document.getElementById('max-price').value = '';
+  document.getElementById('amenity-filter').value = '';
+  document.getElementById('checkin').value = '';
+  document.getElementById('checkout').value = '';
+  filterHotels();
 }
 
 function filterByCity(city) {
   document.getElementById('city-filter').value = city;
   document.getElementById('country-filter').value = '';
   document.getElementById('text-search').value = '';
+  document.getElementById('stars-filter').value = '';
+  document.getElementById('min-price').value = '';
+  document.getElementById('max-price').value = '';
+  document.getElementById('amenity-filter').value = '';
   filterHotels();
   document.getElementById('hotels').scrollIntoView({ behavior: 'smooth' });
 }
@@ -107,7 +154,7 @@ function renderHotels(hotels) {
   }
 
   hotels.forEach(hotel => {
-    const minPrice = hotel.computed_min_price || hotel.min_price || 0;
+    const minPrice = hotel.computed_min_price || hotel.base_min_price || hotel.min_price || 0;
 
     const card = document.createElement('div');
     card.className = 'hotel-card';
@@ -156,10 +203,12 @@ async function openModal(hotelId) {
     const images = await imagesRes.json();
     const priceCalendar = await pricesRes.json();
 
+    const filters = getFilters();
+
     const roomsHTML = rooms.map(room => {
-      const price = currentFilter.checkin
-        ? (priceCalendar.find(p => p.date === currentFilter.checkin)?.min_price || room.min_price || '-')
-        : (room.min_price || priceCalendar[0]?.min_price || '-');
+      const price = filters.checkin
+        ? (priceCalendar.find(p => p.date === filters.checkin)?.min_price || '-')
+        : (priceCalendar[0]?.min_price || '-');
       return `
         <tr>
           <td><strong>${room.name}</strong><br><small>${room.description}</small></td>

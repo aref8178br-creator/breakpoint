@@ -7,8 +7,8 @@ const Price = require('../models/price');
 const hotelController = {
   getAll(req, res) {
     try {
-      const { city, country, search, checkin } = req.query;
-      const hotels = Hotel.findAll({ search, city, country, checkin });
+      const { city, country, search, stars, minPrice, maxPrice, amenity, sortBy, checkin, checkout } = req.query;
+      const hotels = Hotel.findAll({ search, city, country, stars, minPrice, maxPrice, amenity, sortBy, checkin, checkout });
       res.json(hotels);
     } catch (err) {
       res.status(500).json({ error: 'Failed to fetch hotels' });
@@ -74,6 +74,14 @@ const hotelController = {
       res.json(Hotel.getCountries());
     } catch (err) {
       res.status(500).json({ error: 'Failed to fetch countries' });
+    }
+  },
+
+  getAmenityList(req, res) {
+    try {
+      res.json(Hotel.getAmenityList());
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch amenities list' });
     }
   }
 };
