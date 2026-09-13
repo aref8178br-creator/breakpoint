@@ -1,0 +1,20 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "read": {
+      "*.env": "allow"
+    }
+  }
+}
+
+
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "bash": {
+      "ls *": "allow",
+      "cp *": "allow",
+      "rm *": "allow"
+    }
+  }
+}

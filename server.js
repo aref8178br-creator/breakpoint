@@ -1,38 +1,40 @@
-require('dotenv').config();
+const env = require('./config/env');
+const logger = require('./utils/logger');
+const { app, db } = require('./app');
 
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const { initDatabase } = require('./config/database');
-
-const hotelRoutes = require('./routes/hotelRoutes');
-const roomRoutes = require('./routes/roomRoutes');
-const amenityRoutes = require('./routes/amenityRoutes');
-const statsRoutes = require('./routes/statsRoutes');
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || '127.0.0.1';
-
-// Initialize database
-initDatabase();
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'frontend')));
-
-// Routes
-app.use('/api/hotels', hotelRoutes);
-app.use('/api/rooms', roomRoutes);
-app.use('/api/amenities', amenityRoutes);
-app.use('/api/stats', statsRoutes);
-
-// Fallback to index.html
-app.get('/{*path}', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
+const server = app.listen(env.PORT, env.HOST, () => {
+  logger.info(`Server running at http://${env.HOST}:${env.PORT} [${env.NODE_ENV}]`);
 });
 
-app.listen(PORT, HOST, () => {
-  console.log(`Server running at http://${HOST}:${PORT}`);
+function shutdown(signal) {
+  logger.info(`${signal} received, shutting down gracefully...`);
+  server.close(() => {
+    try {
+      db.close();
+    } catch (err) {
+      logger.error({ err }, 'Error closing database');
+    }
+    logger.info('Shutdown complete');
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    logger.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+process.on('unhandledRejection', (err) => {
+  logger.error({ err }, 'Unhandled promise rejection');
+  process.exit(1);
 });
+
+process.on('uncaughtException', (err) => {
+  logger.error({ err }, 'Uncaught exception');
+  process.exit(1);
+});
+
+module.exports = server;

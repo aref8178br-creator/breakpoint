@@ -1,13 +1,18 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const { parseCSV } = require('../utils/csvParser');
+const logger = require('../utils/logger');
+const env = require('./env');
 
-const db = new Database(path.join(__dirname, '..', 'hotel.db'));
+const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'hotel.db');
+const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 5000');
 
 function createTables() {
   db.exec(`
+    DROP TABLE IF EXISTS hotels_fts;
     DROP TABLE IF EXISTS hotel_room_amenities;
     DROP TABLE IF EXISTS images;
     DROP TABLE IF EXISTS room_prices;
@@ -77,6 +82,34 @@ function createTables() {
     CREATE INDEX idx_room_prices_date ON room_prices(date);
     CREATE INDEX idx_images_hotel_id ON images(hotel_id);
     CREATE INDEX idx_images_room_id ON images(room_id);
+
+    CREATE VIRTUAL TABLE hotels_fts USING fts5(
+      name,
+      description,
+      address,
+      city,
+      country,
+      content='hotels',
+      content_rowid='id',
+      tokenize='porter unicode61 remove_diacritics 2'
+    );
+
+    CREATE TRIGGER hotels_ai AFTER INSERT ON hotels BEGIN
+      INSERT INTO hotels_fts(rowid, name, description, address, city, country)
+      VALUES (new.id, new.name, new.description, new.address, new.city, new.country);
+    END;
+
+    CREATE TRIGGER hotels_ad AFTER DELETE ON hotels BEGIN
+      INSERT INTO hotels_fts(hotels_fts, rowid, name, description, address, city, country)
+      VALUES ('delete', old.id, old.name, old.description, old.address, old.city, old.country);
+    END;
+
+    CREATE TRIGGER hotels_au AFTER UPDATE ON hotels BEGIN
+      INSERT INTO hotels_fts(hotels_fts, rowid, name, description, address, city, country)
+      VALUES ('delete', old.id, old.name, old.description, old.address, old.city, old.country);
+      INSERT INTO hotels_fts(rowid, name, description, address, city, country)
+      VALUES (new.id, new.name, new.description, new.address, new.city, new.country);
+    END;
   `);
 }
 
@@ -84,7 +117,7 @@ function seedDatabase() {
   const count = db.prepare('SELECT COUNT(*) as c FROM hotels').get().c;
   if (count > 0) return;
 
-  console.log('Seeding database...');
+  logger.info('Seeding database from CSV files...');
 
   const root = path.join(__dirname, '..');
 
@@ -136,10 +169,27 @@ function seedDatabase() {
     }
   })();
 
-  console.log('Database seeded successfully!');
+  db.exec(`INSERT INTO hotels_fts(hotels_fts) VALUES('rebuild')`);
+
+  logger.info({ hotels: hotels.length, rooms: rooms.length }, 'Database seeded successfully');
 }
 
 function initDatabase() {
+  const tableExists = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='hotels'")
+    .get();
+
+  if (tableExists) {
+    const count = db.prepare('SELECT COUNT(*) as c FROM hotels').get().c;
+    if (count > 0 && !env.ALLOW_DB_RESET) {
+      logger.info({ hotels: count }, 'Database already initialized, skipping reset');
+      return;
+    }
+    if (count > 0 && env.ALLOW_DB_RESET) {
+      logger.warn('ALLOW_DB_RESET=true — dropping and reseeding an existing, non-empty database');
+    }
+  }
+
   createTables();
   seedDatabase();
 }

@@ -5,3 +5,4 @@ hotel.db-shm
 .env
 .DS_Store
 *.log
+tests/.test-*.db*

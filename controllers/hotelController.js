@@ -5,83 +5,111 @@ const Image = require('../models/image');
 const Price = require('../models/price');
 
 const hotelController = {
-  getAll(req, res) {
+  getAll(req, res, next) {
     try {
-      const { city, country, search, stars, minPrice, maxPrice, amenity, sortBy, checkin, checkout } = req.query;
-      const hotels = Hotel.findAll({ search, city, country, stars, minPrice, maxPrice, amenity, sortBy, checkin, checkout });
-      res.json(hotels);
+      const { search, city, country, stars, minPrice, maxPrice, amenity, sortBy, checkin, page, pageSize } =
+        req.query;
+
+      const filters = { search, city, country, stars, minPrice, maxPrice, amenity, sortBy, checkin };
+      const offset = (page - 1) * pageSize;
+
+      const hotels = Hotel.findAll({ ...filters, limit: pageSize, offset });
+      const total = Hotel.count(filters);
+
+      res.json({
+        data: hotels,
+        pagination: {
+          page,
+          pageSize,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / pageSize))
+        }
+      });
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch hotels' });
+      next(err);
     }
   },
 
-  getById(req, res) {
+  suggest(req, res, next) {
+    try {
+      const { q, limit } = req.query;
+      res.json(Hotel.suggest(q, limit));
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  getById(req, res, next) {
     try {
       const hotel = Hotel.findById(req.params.id);
       if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
       res.json(hotel);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch hotel' });
+      next(err);
     }
   },
 
-  getRooms(req, res) {
+  getRooms(req, res, next) {
     try {
-      const rooms = Room.findByHotelId(req.params.id);
-      res.json(rooms);
+      res.json(Room.findByHotelId(req.params.id));
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch rooms' });
+      next(err);
     }
   },
 
-  getAmenities(req, res) {
+  getRoomsWithPrices(req, res, next) {
     try {
-      const amenities = Amenity.findByHotelId(req.params.id);
-      res.json(amenities);
+      res.json(Room.findByHotelIdWithPrices(req.params.id, req.query));
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch amenities' });
+      next(err);
     }
   },
 
-  getImages(req, res) {
+  getAmenities(req, res, next) {
     try {
-      const images = Image.findByHotelId(req.params.id);
-      res.json(images);
+      res.json(Amenity.findByHotelId(req.params.id));
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch images' });
+      next(err);
     }
   },
 
-  getPrices(req, res) {
+  getImages(req, res, next) {
     try {
-      const prices = Price.findByHotelId(req.params.id);
-      res.json(prices);
+      res.json(Image.findByHotelId(req.params.id));
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch prices' });
+      next(err);
     }
   },
 
-  getCities(req, res) {
+  getPrices(req, res, next) {
+    try {
+      res.json(Price.findByHotelId(req.params.id));
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  getCities(req, res, next) {
     try {
       res.json(Hotel.getCities());
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch cities' });
+      next(err);
     }
   },
 
-  getCountries(req, res) {
+  getCountries(req, res, next) {
     try {
       res.json(Hotel.getCountries());
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch countries' });
+      next(err);
     }
   },
 
-  getAmenityList(req, res) {
+  getAmenityList(req, res, next) {
     try {
       res.json(Hotel.getAmenityList());
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch amenities list' });
+      next(err);
     }
   }
 };

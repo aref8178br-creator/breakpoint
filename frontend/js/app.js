@@ -4,7 +4,7 @@ let debounceTimer = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   await initFilters();
-  await loadHotels();
+  await filterHotels();
   setupModalClose();
   loadStats();
 
@@ -96,15 +96,34 @@ async function filterHotels() {
     if (val) params.set(key, val);
   });
 
+  const grid = document.getElementById('hotel-grid');
+  const countEl = document.getElementById('results-count');
+
   try {
     const res = await fetch(`${API}/api/hotels?${params}`);
-    const hotels = await res.json();
+
+    if (!res.ok) {
+      // Validation errors (400) and server errors (5xx) land here.
+      // Surface something readable instead of silently failing or crashing
+      // on the .data/.pagination shape below.
+      const body = await res.json().catch(() => ({}));
+      grid.innerHTML = `<div class="no-results"><h3>Couldn't load hotels</h3><p>${
+        body.error || 'Please try again.'
+      }</p></div>`;
+      countEl.textContent = '';
+      return;
+    }
+
+    // The API returns { data, pagination } rather than a bare array so the
+    // UI can show result counts and support paging without a second request.
+    const { data: hotels, pagination } = await res.json();
     renderHotels(hotels);
 
-    const countEl = document.getElementById('results-count');
-    countEl.textContent = `${hotels.length} hotel${hotels.length !== 1 ? 's' : ''} found`;
+    countEl.textContent = `${pagination.total} hotel${pagination.total !== 1 ? 's' : ''} found`;
   } catch (e) {
     console.error('Failed to filter hotels:', e);
+    grid.innerHTML = '<div class="no-results"><h3>Couldn\'t load hotels</h3><p>Please check your connection and try again.</p></div>';
+    countEl.textContent = '';
   }
 }
 
@@ -189,53 +208,74 @@ async function openModal(hotelId) {
   document.body.style.overflow = 'hidden';
 
   try {
-    const [hotelRes, roomsRes, amenitiesRes, imagesRes, pricesRes] = await Promise.all([
+    const filters = getFilters();
+
+    const rangeParams = new URLSearchParams();
+    if (filters.checkin) rangeParams.set('checkin', filters.checkin);
+    if (filters.checkout) rangeParams.set('checkout', filters.checkout);
+
+    const [hotelRes, amenitiesRes, imagesRes, pricesRes, roomsRes] = await Promise.all([
       fetch(`${API}/api/hotels/${hotelId}`),
-      fetch(`${API}/api/hotels/${hotelId}/rooms`),
       fetch(`${API}/api/hotels/${hotelId}/amenities`),
       fetch(`${API}/api/hotels/${hotelId}/images`),
-      fetch(`${API}/api/hotels/${hotelId}/prices`)
+      fetch(`${API}/api/hotels/${hotelId}/prices`),
+      fetch(`${API}/api/hotels/${hotelId}/rooms-with-prices?${rangeParams}`)
     ]);
 
     const hotel = await hotelRes.json();
-    const rooms = await roomsRes.json();
     const amenities = await amenitiesRes.json();
     const images = await imagesRes.json();
     const priceCalendar = await pricesRes.json();
+    const roomsWithPrices = await roomsRes.json();
 
-    const filters = getFilters();
+    const hasDateRange = filters.checkin && filters.checkout;
+    const stayNights = hasDateRange
+      ? Math.max(1, Math.round((new Date(filters.checkout) - new Date(filters.checkin)) / 86400000))
+      : 1;
 
-    const roomsHTML = rooms.map(room => {
-      const price = filters.checkin
-        ? (priceCalendar.find(p => p.date === filters.checkin)?.min_price || '-')
-        : (priceCalendar[0]?.min_price || '-');
+    const roomsHTML = roomsWithPrices.map(room => {
+      const exact = (room.prices || []).find(p => p.date === filters.checkin);
+      let priceHTML;
+      if (hasDateRange) {
+        priceHTML = `$${room.avgNightly} <span>/night avg</span><br><small>${room.nights} night${room.nights !== 1 ? 's' : ''} &middot; <strong>$${room.total} total</strong></small>`;
+      } else if (filters.checkin && exact) {
+        priceHTML = `$${exact.price} <span>/night</span>`;
+      } else {
+        const first = (room.prices || [])[0];
+        priceHTML = `$${first ? first.price : '-'} <span>/night</span>`;
+      }
       return `
         <tr>
-          <td><strong>${room.name}</strong><br><small>${room.description}</small></td>
+          <td class="room-cell">
+            <img class="room-thumb" src="${room.image_path || getHotelCoverImage(hotel)}" alt="${room.name}" onerror="this.style.display='none'">
+            <div class="room-info">
+              <strong>${room.name}</strong><br>
+              <small>${room.description}</small>
+            </div>
+          </td>
           <td>${room.capacity} guests</td>
-          <td class="room-price">$${price}</td>
+          <td class="room-price">${priceHTML}</td>
           <td><button class="book-btn" onclick="alert('Booking confirmed for ${room.name} at ${hotel.name}!')">Book Now</button></td>
         </tr>
       `;
     }).join('');
 
-    let calendarHTML = '';
     const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    calendarHTML += daysOfWeek.map(d => `<div class="calendar-day header">${d}</div>`).join('');
+    let calendarHTML = daysOfWeek.map(d => `<div class="calendar-day header">${d}</div>`).join('');
 
-    const firstDay = new Date('2026-09-10').getDay();
+    const firstDay = new Date('2026-09-01').getDay();
     for (let i = 0; i < firstDay; i++) {
       calendarHTML += '<div class="calendar-day"></div>';
     }
 
-    for (let d = 10; d <= 30; d++) {
+    for (let d = 1; d <= 30; d++) {
       const dateStr = `2026-09-${d.toString().padStart(2, '0')}`;
       const dayOfWeek = new Date(dateStr).getDay();
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6;
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
       const dayPrice = priceCalendar.find(p => p.date === dateStr);
 
       calendarHTML += `
-        <div class="calendar-day ${isWeekend ? 'weekend' : ''}">
+        <div class="calendar-day ${isWeekend ? 'weekend' : ''} ${filters.checkin === dateStr ? 'selected' : ''}">
           <div class="date">${d}</div>
           <div class="price">$${dayPrice ? dayPrice.min_price : '-'}</div>
         </div>
@@ -261,7 +301,8 @@ async function openModal(hotelId) {
         </div>
 
         <div class="rooms-section">
-          <h3>Available Rooms</h3>
+          <h3>Available Rooms (prices for ${hasDateRange ? `${filters.checkin} → ${filters.checkout}` : (filters.checkin || 'every night')})</h3>
+          ${roomsWithPrices.length === 0 ? '<p>No rooms available for the selected dates.</p>' : `
           <table class="room-table">
             <thead>
               <tr>
@@ -273,10 +314,11 @@ async function openModal(hotelId) {
             </thead>
             <tbody>${roomsHTML}</tbody>
           </table>
+          `}
         </div>
 
         <div class="price-calendar">
-          <h3>Price Calendar (September 2026)</h3>
+          <h3>Price Calendar (September 2026, lowest price per night)</h3>
           <div class="calendar-grid">${calendarHTML}</div>
         </div>
       </div>

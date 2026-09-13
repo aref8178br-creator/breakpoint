@@ -2,22 +2,21 @@ const Room = require('../models/room');
 const Price = require('../models/price');
 
 const roomController = {
-  getById(req, res) {
+  getById(req, res, next) {
     try {
       const room = Room.findById(req.params.id);
       if (!room) return res.status(404).json({ error: 'Room not found' });
       res.json(room);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch room' });
+      next(err);
     }
   },
 
-  getPrices(req, res) {
+  getPrices(req, res, next) {
     try {
-      const prices = Price.findByRoomId(req.params.id);
-      res.json(prices);
+      res.json(Price.findByRoomId(req.params.id));
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch room prices' });
+      next(err);
     }
   }
 };

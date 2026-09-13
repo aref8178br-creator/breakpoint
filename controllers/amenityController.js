@@ -1,12 +1,12 @@
 const Amenity = require('../models/amenity');
 
 const amenityController = {
-  getAll(req, res) {
+  getAll(req, res, next) {
     try {
       const amenities = Amenity.findAll();
       res.json(amenities);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch amenities' });
+      next(err);
     }
   }
 };
