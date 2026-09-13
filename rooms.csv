@@ -1,0 +1,37 @@
+id,hotel_id,name,description,capacity
+1,1,Standard Room,Comfortable room with city view.,2
+2,1,Deluxe Room,Spacious room with upgraded amenities.,3
+3,1,Executive Suite,Suite with separate living area.,4
+4,2,Standard Room,Compact room in the Old Town district.,2
+5,2,Deluxe Room,Room with courtyard view.,3
+6,2,Junior Suite,Suite with extra seating area.,4
+7,3,Standard Room,Garden-facing room.,2
+8,3,Sea View Deluxe,Room with direct sea view and balcony.,3
+9,3,Beachfront Suite,Ground-floor suite with beach access.,4
+10,4,Standard Room,"Compact room, city-facing.",2
+11,4,Deluxe Room,Room on a higher floor with partial sea view.,3
+12,4,Panoramic Suite,Top-floor suite with 180-degree sea view.,4
+13,5,Standard Room,Comfortable room near the marina promenade.,2
+14,5,Marina View Deluxe,Room with floor-to-ceiling marina views.,3
+15,5,Marina Suite,Suite with a private balcony over the marina.,4
+16,6,Standard Room,Well-appointed room in the city center.,2
+17,6,Deluxe Room,Room with a seating area and kitchenette.,3
+18,6,Burj View Suite,Suite with direct views of the Burj Khalifa.,4
+19,7,Standard Room,"Room with a calm, contemporary design.",2
+20,7,Sea View Deluxe,Room with a private balcony over the Gulf.,3
+21,7,Corniche Suite,Suite overlooking the Corniche waterfront.,4
+22,8,Standard Room,Garden-facing room near the pools.,2
+23,8,Deluxe Room,Room with direct beach access.,3
+24,8,Garden Suite,Suite set among the resort's palm gardens.,4
+25,9,Standard Room,Compact room with Shinjuku skyline views.,2
+26,9,Deluxe Room,Room with larger windows and a work desk.,3
+27,9,Skyline Suite,Suite with panoramic night views of the city.,4
+28,10,Standard Room,Comfortable room near the bay.,2
+29,10,Bay View Deluxe,Room with a direct view of Tokyo Bay.,3
+30,10,Bay Suite,Suite with a private terrace over the bay.,4
+31,11,Standard Room,Cozy room in the historic building.,2
+32,11,Heritage Deluxe,Room with restored period details.,3
+33,11,Heritage Suite,Suite with a private sitting room.,4
+34,12,Standard Room,Quiet room away from the castle-facing side.,2
+35,12,Castle View Deluxe,Room with a direct view of Osaka Castle.,3
+36,12,Castle Suite,Suite with a wraparound view of the castle park.,4
